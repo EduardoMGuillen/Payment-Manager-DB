@@ -21,6 +21,31 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS pagos (
 conn.commit()
 conn.close()
 
+class LoginWindow(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Inicio de Sesión")
+        self.geometry("300x250")
+
+        ctk.CTkLabel(self, text="Usuario:").pack(pady=5)
+        self.entry_usuario = ctk.CTkEntry(self)
+        self.entry_usuario.pack(pady=5)
+
+        ctk.CTkLabel(self, text="Contraseña:").pack(pady=5)
+        self.entry_contrasena = ctk.CTkEntry(self, show="*")
+        self.entry_contrasena.pack(pady=5)
+
+        ctk.CTkButton(self, text="Ingresar", command=self.verificar_credenciales).pack(pady=10)
+
+    def verificar_credenciales(self):
+        usuario = self.entry_usuario.get()
+        contrasena = self.entry_contrasena.get()
+        if usuario == "admin" and contrasena == "admin2025":
+            self.withdraw()  # Ocultar la ventana de login
+            app = PagosApp()  # Crear la ventana de la aplicación de pagos
+            app.mainloop()  # Iniciar la aplicación
+        else:
+            messagebox.showerror("Error", "Usuario o contraseña incorrectos")
 
 class PagosApp(ctk.CTk):
     def __init__(self):
@@ -81,7 +106,7 @@ class PagosApp(ctk.CTk):
     def actualizar_pagos(self):
         ventana = ctk.CTkToplevel(self)
         ventana.title("Actualizar Pagos y Ver Perfil")
-        ventana.geometry("600x500")  # Aumentado el tamaño para ajustarse al contenido
+        ventana.geometry("600x500")
 
         ctk.CTkLabel(ventana, text="Buscar Cliente por ID o Nombre:").pack(pady=10)
         entry_busqueda = ctk.CTkEntry(ventana)
@@ -102,7 +127,7 @@ class PagosApp(ctk.CTk):
 
         ctk.CTkLabel(ventana, text="Seleccione Cliente:").pack(pady=10)
         lista_clientes = ctk.CTkComboBox(ventana, values=[], width=300)
-        lista_clientes.set("")  # Aseguramos que esté vacío inicialmente
+        lista_clientes.set("")
         lista_clientes.pack(pady=5)
 
         ctk.CTkLabel(ventana, text="Mes de Pago:").pack(pady=5)
@@ -135,14 +160,18 @@ class PagosApp(ctk.CTk):
     def modificar_perfil(self):
         ventana = ctk.CTkToplevel(self)
         ventana.title("Modificar Perfil")
-        ventana.geometry("600x500")
+        ventana.geometry("700x600")
 
         ctk.CTkLabel(ventana, text="Buscar Cliente por ID o Nombre:").pack(pady=10)
-        entry_busqueda = ctk.CTkEntry(ventana)
+        entry_busqueda = ctk.CTkEntry(ventana, width=400)
         entry_busqueda.pack(pady=5)
 
         def buscar_cliente():
-            criterio = entry_busqueda.get()
+            criterio = entry_busqueda.get().strip()
+            if not criterio:
+                messagebox.showwarning("Entrada vacía", "Por favor ingrese un ID o nombre para buscar.")
+                return
+
             conn = sqlite3.connect("clientes.db")
             cursor = conn.cursor()
             cursor.execute("SELECT cliente_id, nombre FROM clientes WHERE cliente_id = ? OR nombre LIKE ?",
@@ -150,31 +179,35 @@ class PagosApp(ctk.CTk):
             clientes = cursor.fetchall()
             conn.close()
 
+            if not clientes:
+                messagebox.showinfo("Sin resultados", "No se encontraron clientes con ese criterio.")
+                return
+
             lista_clientes.configure(values=[f"{c[0]} - {c[1]}" for c in clientes])
 
         ctk.CTkButton(ventana, text="Buscar", command=buscar_cliente).pack(pady=5)
 
         ctk.CTkLabel(ventana, text="Seleccione Cliente:").pack(pady=10)
-        lista_clientes = ctk.CTkComboBox(ventana, values=[], width=300)
-        lista_clientes.set("")  # Aseguramos que esté vacío inicialmente
+        lista_clientes = ctk.CTkComboBox(ventana, values=[], width=400)
+        lista_clientes.set("")
         lista_clientes.pack(pady=5)
 
         ctk.CTkLabel(ventana, text="Nombre:").pack(pady=5)
-        entry_nombre = ctk.CTkEntry(ventana)
+        entry_nombre = ctk.CTkEntry(ventana, width=400)
         entry_nombre.pack(pady=5)
 
         ctk.CTkLabel(ventana, text="Dirección:").pack(pady=5)
-        entry_direccion = ctk.CTkEntry(ventana)
+        entry_direccion = ctk.CTkEntry(ventana, width=400)
         entry_direccion.pack(pady=5)
 
         ctk.CTkLabel(ventana, text="Teléfono:").pack(pady=5)
-        entry_telefono = ctk.CTkEntry(ventana)
+        entry_telefono = ctk.CTkEntry(ventana, width=400)
         entry_telefono.pack(pady=5)
 
         def cargar_datos_cliente():
             cliente_seleccionado = lista_clientes.get()
             if cliente_seleccionado:
-                cliente_id = cliente_seleccionado.split(" - ")[0]  # Obtener el ID del cliente
+                cliente_id = cliente_seleccionado.split(" - ")[0]
                 conn = sqlite3.connect("clientes.db")
                 cursor = conn.cursor()
                 cursor.execute("SELECT nombre, direccion, telefono FROM clientes WHERE cliente_id = ?", (cliente_id,))
@@ -182,7 +215,6 @@ class PagosApp(ctk.CTk):
                 conn.close()
 
                 if cliente:
-                    # Cargar los datos del cliente en los campos de entrada
                     entry_nombre.delete(0, 'end')
                     entry_nombre.insert(0, cliente[0])
                     entry_direccion.delete(0, 'end')
@@ -200,34 +232,21 @@ class PagosApp(ctk.CTk):
             cliente_seleccionado = lista_clientes.get()
             if cliente_seleccionado:
                 cliente_id = cliente_seleccionado.split(" - ")[0]
+                if not entry_nombre.get().strip() or not entry_direccion.get().strip() or not entry_telefono.get().strip():
+                    messagebox.showwarning("Campos vacíos", "Por favor complete todos los campos antes de guardar.")
+                    return
+
                 conn = sqlite3.connect("clientes.db")
                 cursor = conn.cursor()
                 cursor.execute("UPDATE clientes SET nombre=?, direccion=?, telefono=? WHERE cliente_id=?",
-                               (entry_nombre.get(), entry_direccion.get(), entry_telefono.get(), cliente_id))
+                               (entry_nombre.get().strip(), entry_direccion.get().strip(), entry_telefono.get().strip(),
+                                cliente_id))
                 conn.commit()
                 conn.close()
-                messagebox.showinfo("Éxito", "Perfil actualizado correctamente")
+                messagebox.showinfo("Éxito", "Datos del cliente actualizados correctamente.")
                 ventana.destroy()
 
         ctk.CTkButton(ventana, text="Guardar Cambios", command=guardar_modificacion).pack(pady=10)
-
-    def buscar_cliente_modificar(self, entry_busqueda, ventana):
-        criterio = entry_busqueda.get()
-        conn = sqlite3.connect("clientes.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT cliente_id, nombre FROM clientes WHERE cliente_id = ? OR nombre LIKE ?",
-                       (criterio, f"%{criterio}%"))
-        clientes = cursor.fetchall()
-        conn.close()
-
-        lista_clientes = ventana.winfo_children()[6]  # Obtener el ComboBox de clientes desde la ventana
-
-        if clientes:
-            # Actualizar el ComboBox con los clientes encontrados
-            lista_clientes.set_values([f"{c[0]} - {c[1]}" for c in clientes])  # Esto solo se aplica a CTkComboBox
-        else:
-            messagebox.showinfo("No se encontraron resultados", "No se encontraron clientes con ese ID o nombre.")
-            lista_clientes.set_values([])  # Limpiar la lista si no hay resultados
 
     def generar_reporte(self):
         ventana = ctk.CTkToplevel(self)
@@ -301,7 +320,6 @@ class PagosApp(ctk.CTk):
         # Botón de generación del reporte
         ctk.CTkButton(ventana, text="Generar Reporte", command=mostrar_reporte).pack(pady=(5, 10))
 
-
 if __name__ == "__main__":
-    app = PagosApp()
+    app = LoginWindow()
     app.mainloop()
